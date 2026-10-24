@@ -24,6 +24,7 @@
 # Options:
 #   --apply, -a            Actually do it (default is dry run)
 #   --yes, -y              Skip the move-to-Trash confirmation (uninstall)
+#   --docker-prune         dev/all: prune Docker data when explicitly requested
 #   --launchservices       optimize: also rebuild the Launch Services DB
 #   --spotlight            optimize: also rebuild the Spotlight index (slow)
 #
@@ -42,8 +43,10 @@ APPLY=0
 YES=0
 LSREG=0
 SPOT=0
+DOCKER_PRUNE=0
 TOTAL_KB=0
 SKIP_CLEAN=("")
+SAFE_PATH=""
 
 if [[ -t 1 ]]; then
   BOLD=$'\033[1m'; DIM=$'\033[2m'; RED=$'\033[31m'; GRN=$'\033[32m'
@@ -72,10 +75,15 @@ kb_of() {
   echo "${v:-0}"
 }
 
-# Only allow deleting the *contents* of directories strictly inside $HOME.
+# Resolve the target before allowing deletion, so symlinked paths cannot escape HOME.
 safe_path() {
-  local p="$1"
-  [[ -n "$p" && "$p" == "$HOME/"* && "$p" != "$HOME/" && ${#p} -gt $(( ${#HOME} + 3 )) ]]
+  local home_real path_real
+  SAFE_PATH=""
+  [[ -n "$1" && -d "$1" ]] || return 1
+  home_real=$(cd -P "$HOME" 2>/dev/null && pwd -P) || return 1
+  path_real=$(cd -P "$1" 2>/dev/null && pwd -P) || return 1
+  [[ "$home_real" != "/" && "$path_real" == "$home_real/"* ]] || return 1
+  SAFE_PATH="$path_real"
 }
 
 prompt_clean_skips() {
@@ -103,7 +111,7 @@ prompt_clean_skips() {
 
 # Empty a directory (keeps the directory itself). Dry-run unless --apply.
 clean_dir() {
-  local label="$1" dir="$2" number="${3:-}" skip
+  local label="$1" dir="$2" number="${3:-}" skip target
   for skip in "${SKIP_CLEAN[@]}"; do
     if [[ -n "$number" && "$skip" == "$number" ]]; then
       printf "  ${YLW}skipped${RST}     %s\n" "$label"
@@ -115,14 +123,15 @@ clean_dir() {
   (( kb > 0 )) || return 0
   if (( APPLY )); then
     if safe_path "$dir"; then
-      if find "$dir" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null; then
-        local remaining; remaining=$(kb_of "$dir")
+      target="$SAFE_PATH"
+      if find "$target" -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null; then
+        local remaining; remaining=$(kb_of "$target")
         local removed=$(( kb - remaining ))
         (( removed < 0 )) && removed=0
         (( removed > 0 )) && TOTAL_KB=$(( TOTAL_KB + removed ))
         printf "  ${GRN}cleaned${RST}     %-36s %s\n" "$label" "$(human "$removed")"
       else
-        local remaining; remaining=$(kb_of "$dir")
+        local remaining; remaining=$(kb_of "$target")
         local removed=$(( kb - remaining ))
         (( removed < 0 )) && removed=0
         (( removed > 0 )) && TOTAL_KB=$(( TOTAL_KB + removed ))
@@ -130,7 +139,7 @@ clean_dir() {
         printf "  ${YLW}partial${RST}     %-36s %s\n" "$label" "$(human "$removed")"
       fi
     else
-      warn "refusing unsafe path: $dir"
+      warn "refusing unsafe path or symlink target: $dir"
     fi
   else
     TOTAL_KB=$(( TOTAL_KB + kb ))
@@ -257,7 +266,11 @@ cmd_dev() {
   if have docker && docker info >/dev/null 2>&1; then
     printf "  %s%s%s      stopped containers, dangling images, unused networks:\n" "$YLW" "docker" "$RST"
     docker system df 2>/dev/null | sed 's/^/      /'
-    run_cmd "docker system prune -f" docker system prune -f
+    if (( DOCKER_PRUNE )); then
+      run_cmd "docker system prune -f (removes stopped containers and unused data)" docker system prune -f
+    else
+      printf "  %snot pruning%s  pass --docker-prune to remove stopped containers and unused data\n" "$DIM" "$RST"
+    fi
   fi
 
   summary
@@ -269,6 +282,7 @@ cmd_dev() {
 cmd_uninstall() {
   local name="${1:-}"
   [[ -n "$name" ]] || die "usage: macsweep uninstall \"App Name\" [--apply]"
+  [[ "$name" != */* && "$name" != "." && "$name" != ".." ]] || die "app name must not contain a path"
   banner
 
   local app=""
@@ -301,10 +315,6 @@ cmd_uninstall() {
     "$HOME/Library/WebKit"
     "$HOME/Library/Cookies"
     "$HOME/Library/LaunchAgents"
-    "/Library/Application Support"
-    "/Library/Preferences"
-    "/Library/LaunchAgents"
-    "/Library/LaunchDaemons"
   )
 
   local items=("$app")
@@ -319,16 +329,7 @@ cmd_uninstall() {
           [[ "$existing" == "$p" ]] && { duplicate=1; break; }
         done
         (( duplicate )) || items+=("$p")
-      done < <(find "$l" -maxdepth 1 \( -iname "$bid" -o -iname "$bid.*" -o -iname "*.$bid" -o -iname "$bid-*" \) 2>/dev/null)
-    fi
-    # exact app-name folder (e.g. ~/Library/Application Support/Slack)
-    p="$l/$name"
-    if [[ -e "$p" ]]; then
-      duplicate=0
-      for existing in "${items[@]}"; do
-        [[ "$existing" == "$p" ]] && { duplicate=1; break; }
-      done
-      (( duplicate )) || items+=("$p")
+      done < <(find "$l" -maxdepth 1 \( -iname "$bid" -o -iname "$bid.plist" \) 2>/dev/null)
     fi
   done
 
@@ -339,7 +340,7 @@ cmd_uninstall() {
     printf "  %-9s %s\n" "$(human "$kb")" "$p"
   done
   printf "\n%s\n" "${BOLD}Total: $(human "$total")${RST}"
-  printf "%s\n" "${DIM}Review the list: exact-name matches can occasionally catch unrelated folders.${RST}"
+  printf "%s\n" "${DIM}Only exact bundle-ID matches are included; other app data is left untouched.${RST}"
 
   if (( ! APPLY )); then
     (( app_running )) && printf "  %sApply mode will ask whether to quit it before uninstalling.%s\n" "$DIM" "$RST"
@@ -380,7 +381,7 @@ cmd_uninstall() {
     if mv "$p" "$target" 2>/dev/null; then
       printf "  ${GRN}trashed${RST}  %s -> %s\n" "$p" "$target"
     else
-      printf "  ${RED}failed${RST}   %s  (try: sudo mv ...)\n" "$p"
+      printf "  ${RED}failed${RST}   %s\n" "$p"
     fi
   done
   printf "Done. Items are grouped in %s; empty the Trash to reclaim the space.\n" "$trash_dir"
@@ -462,6 +463,7 @@ main() {
     case "$a" in
       --apply|-a)       APPLY=1 ;;
       --yes|-y)         YES=1 ;;
+      --docker-prune)   DOCKER_PRUNE=1 ;;
       --launchservices) LSREG=1 ;;
       --spotlight)      SPOT=1 ;;
       *)                args+=("$a") ;;
@@ -488,4 +490,6 @@ main() {
   esac
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  main "$@"
+fi

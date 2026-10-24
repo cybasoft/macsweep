@@ -42,6 +42,7 @@ Commands:
 Options:
   --apply, -a            Execute changes (default: preview only)
   --yes, -y              Skip the move-to-Trash confirmation for uninstall
+  --docker-prune         dev/all: prune Docker data when explicitly requested
   --launchservices       Also rebuild the Launch Services database (optimize)
   --spotlight            Also erase and rebuild the Spotlight index (optimize)
 ```
@@ -73,7 +74,7 @@ Previews or clears the four numbered targets above. Also reports iOS device back
 
 ### `dev`
 
-Previews or runs cleanup for Xcode DerivedData and iOS DeviceSupport, unavailable simulator devices, npm and Composer caches, Gradle caches, the pnpm store, Homebrew cleanup, and Docker system prune when the relevant tools are installed. Some data may need to be downloaded or rebuilt later. Docker cleanup does not request volume removal.
+Previews or runs cleanup for Xcode DerivedData and iOS DeviceSupport, unavailable simulator devices, npm and Composer caches, Gradle caches, the pnpm store, and Homebrew cleanup when the relevant tools are installed. Docker storage is reported but not pruned by default. Pass `--docker-prune` to run `docker system prune -f`, which removes stopped containers and unused Docker data; it does not request volume removal. Some cleaned data may need to be downloaded or rebuilt later.
 
 ### `all`
 
@@ -81,7 +82,7 @@ Runs `clean` followed by `dev`. In an interactive terminal, answer the `clean` s
 
 ### `uninstall <App Name>`
 
-Looks for `<App Name>.app` in `/Applications` and `~/Applications`, then lists bundle-ID and exact-name matches in common Library locations. Review the matches carefully; exact-name matches may include unrelated data. With `--apply`, the script asks before moving matches into a unique folder under `~/.Trash`. If the app appears to be running, it separately asks whether to request a graceful quit; declining or failing to quit stops the move. `--yes` skips only the move confirmation, not the quit prompt.
+Looks for `<App Name>.app` in `/Applications` and `~/Applications`, then lists exact bundle-ID matches and matching preference plist files under common locations in `~/Library`. It does not move system-wide data from `/Library`; related system helpers may need separate removal. Other app data is left untouched. With `--apply`, the script asks before moving matches into a unique folder under `~/.Trash`. If the app appears to be running, it separately asks whether to request a graceful quit; declining or failing to quit stops the move. `--yes` skips only the move confirmation, not the quit prompt.
 
 ### `large [dir] [minMB]`
 
@@ -106,6 +107,7 @@ macsweep health
 macsweep clean                 # preview; choose targets to skip
 macsweep clean --apply         # apply after choosing targets to skip
 macsweep dev --apply
+macsweep dev --docker-prune --apply
 macsweep all                   # preview clean and developer cleanup
 macsweep all --apply
 macsweep uninstall "Slack" --apply
@@ -116,3 +118,7 @@ macsweep optimize --apply --launchservices
 ## License
 
 macsweep is licensed under the [MIT License](LICENSE).
+
+## Checks
+
+Run `bash -n macsweep.sh`, `shellcheck macsweep.sh`, and `bash tests/safety.sh` before release. The safety tests require macOS and use a temporary home directory; Docker and Homebrew are mocked, and uninstall is only previewed.

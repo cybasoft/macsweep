@@ -9,6 +9,8 @@ PUBLISH="${2:-}"
 [[ -z "$(git status --porcelain)" ]] || { echo "working tree not clean"; exit 1; }
 
 REPO_DIR=$(cd "$(dirname "$0")" && pwd)
+OUT_DIR="$REPO_DIR/.temp"
+mkdir -p "$OUT_DIR"
 WORK_DIR=$(mktemp -d)
 trap 'rm -rf "$WORK_DIR"' EXIT
 
@@ -28,8 +30,9 @@ tar -C "$WORK_DIR" -czf "$TARBALL" macsweep/
 CHECKSUM=$(shasum -a 256 "$TARBALL" | awk '{print $1}')
 printf "SHA-256: %s\n" "$CHECKSUM"
 
-cp "$TARBALL" "$REPO_DIR/macsweep-$VERSION.tar.gz"
-printf "Release artifact: macsweep-%s.tar.gz\n" "$VERSION"
+ARTIFACT="$OUT_DIR/macsweep-$VERSION.tar.gz"
+cp "$TARBALL" "$ARTIFACT"
+printf "Release artifact: %s\n" "$ARTIFACT"
 printf "Checksum: %s\n" "$CHECKSUM"
 
 if [[ "$PUBLISH" == "--publish" ]]; then
@@ -39,12 +42,12 @@ if [[ "$PUBLISH" == "--publish" ]]; then
   }
   git push origin "$TAG" 2>/dev/null || printf "Tag already pushed.\n" >&2
   
-  gh release create "$TAG" "$REPO_DIR/macsweep-$VERSION.tar.gz" \
+  gh release create "$TAG" "$ARTIFACT" \
     --title "macsweep $VERSION" \
     --notes "MacSweep $VERSION: modular macOS utility toolbox with core CLI and optional modules." \
     --verify-tag 2>/dev/null || {
     printf "Release %s already exists. Uploading artifact...\n" "$TAG" >&2
-    gh release upload "$TAG" "$REPO_DIR/macsweep-$VERSION.tar.gz" --clobber
+    gh release upload "$TAG" "$ARTIFACT" --clobber
   }
   
   printf "\n✓ Published macsweep-%s\n" "$VERSION"

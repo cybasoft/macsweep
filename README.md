@@ -22,32 +22,54 @@ chmod +x ~/bin/macsweep
 
 Ensure `~/bin` is in your `PATH`, then run `macsweep`. Alternatively, run the script directly with `bash macsweep.sh`.
 
+## Homebrew
+
+```bash
+brew tap cybasoft/tap
+brew install macsweep
+```
+
+
 ## Usage
 
 ```text
 macsweep <command> [options]
 
-Commands:
-  health                 Show disk, memory, CPU, battery, and security status
-  clean                  Preview or clear selected user cleanup targets
-  dev                    Preview or clear developer caches and tool data
-  all                    Run clean, then dev
-  uninstall <App Name>   Find an app and matching leftovers; move them to Trash
-  large [dir] [minMB]    Find large files and top-level folders
-  startup                List login items and launch agent/daemon plist files
-  optimize               Run maintenance commands
-  updates                List available macOS software updates
-  help                   Show command help
+Core commands:
+  system health             Show disk, memory, CPU, battery, and security status
+  system optimize           Run maintenance commands
+  system updates            List available macOS software updates
+  clean system              Preview or clear selected user cleanup targets
+  clean dev                 Preview or clear developer caches and tool data
+  clean large [dir] [MB]    Find large files and top-level folders
+  apps uninstall <App Name> Find an app and matching leftovers; move them to Trash
+  startup                   List login items and launch agent/daemon plist files
+
+Optional modules:
+  ports [port]              Inspect listeners and processes
+  network                   Run network diagnostics
+  doctor                    Diagnose development environment setup
+  files <subcommand>        Inspect symlinks, permissions, attributes, and metadata
+  json <subcommand>         Validate, format, compare, and query JSON
+
+Management:
+  list                      List installed and available modules
+  install <module>          Install an optional module
+  uninstall <module>        Remove an optional module
+  update [module]           Update an optional module or all installed modules
 
 Options:
   --apply, -a            Execute changes (default: preview only)
   --yes, -y              Skip the move-to-Trash confirmation for uninstall
+  --non-interactive      Never prompt; missing modules return an install instruction
   --docker-prune         dev/all: prune Docker data when explicitly requested
   --launchservices       Also rebuild the Launch Services database (optimize)
   --spotlight            Also erase and rebuild the Spotlight index (optimize)
 ```
 
 Options can appear after the command or its arguments. Quote app names or paths containing spaces.
+
+The legacy commands `health`, `clean`, `dev`, `all`, `uninstall`, `large`, `startup`, `optimize`, and `updates` remain temporary compatibility aliases.
 
 ## Clean Targets
 
@@ -100,19 +122,48 @@ With `--apply`, flushes DNS caches, runs `purge`, and resets the QuickLook cache
 
 Lists available macOS software updates; it does not install them.
 
+## Toolbox modules
+
+Optional modules are not installed with the core CLI.
+
+| Module | Command | Purpose |
+| --- | --- | --- |
+| PortSweep | `macsweep ports [port]` | Listen on TCP ports and identify processes |
+| NetSweep | `macsweep network` | Inspect DNS, connectivity, latency, and configuration |
+| DevSweep | `macsweep doctor` | Diagnose PATH, shell, language, Homebrew, Git, and Docker setup |
+| FileSweep | `macsweep files <subcommand> [path]` | Inspect symlinks, permissions, hidden files, metadata, and attributes |
+| JSONSweep | `macsweep json <subcommand> <file>` | Pretty-print, validate, compare, and query JSON |
+
+Module commands display an installation prompt in an interactive terminal. Non-interactive runs never prompt and exit with a missing-module instruction. Modules are stored under `~/.local/share/macsweep/modules/`; cache data is stored under `~/.local/share/macsweep/cache/`.
+
+```bash
+macsweep list
+macsweep install ports
+macsweep install ports --version 1.0.0
+macsweep uninstall ports
+macsweep update
+macsweep update ports
+```
+
+Modules come only from the static registry in `modules.tsv`. Installer downloads are limited to pinned Cybasoft GitHub release paths and verified with a SHA-256 checksum before installation. Downloads are staged in a temporary directory and modules are never overwritten silently.
+
 ## Examples
 
 ```bash
-macsweep health
-macsweep clean                 # preview; choose targets to skip
-macsweep clean --apply         # apply after choosing targets to skip
-macsweep dev --apply
-macsweep dev --docker-prune --apply
-macsweep all                   # preview clean and developer cleanup
-macsweep all --apply
-macsweep uninstall "Slack" --apply
-macsweep large ~/Downloads 200
-macsweep optimize --apply --launchservices
+macsweep system health
+macsweep clean system          # preview; choose targets to skip
+macsweep clean system --apply  # apply after choosing targets to skip
+macsweep clean dev --apply
+macsweep clean dev --docker-prune --apply
+macsweep clean large ~/Downloads 200
+macsweep apps uninstall "Slack" --apply
+macsweep system optimize --apply --launchservices
+
+macsweep ports
+macsweep network
+macsweep doctor
+macsweep files symlinks ~/Projects
+macsweep json pretty file.json
 ```
 
 ## License
@@ -121,4 +172,4 @@ macsweep is licensed under the [MIT License](LICENSE).
 
 ## Checks
 
-Run `bash -n macsweep.sh`, `shellcheck macsweep.sh`, and `bash tests/safety.sh` before release. The safety tests require macOS and use a temporary home directory; Docker and Homebrew are mocked, and uninstall is only previewed.
+Run `bash -n macsweep.sh core/*.sh tools/*/module.sh`, `shellcheck macsweep.sh core/*.sh tools/*/module.sh`, and `bash tests/safety.sh` before release. The safety tests require macOS and use a temporary home directory; Docker and Homebrew are mocked, and uninstall is only previewed.

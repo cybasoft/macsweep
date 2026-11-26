@@ -3,3 +3,7 @@
 *.swo
 *.bak
 *.tmp
+.temp
+.log
+.cache
+.logs

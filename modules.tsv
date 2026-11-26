@@ -1,0 +1,6 @@
+# id|display name|version|description|release artifact|sha256|minimum MacSweep
+ports|PortSweep|1.0.0|Inspect listening ports and processes|https://raw.githubusercontent.com/cybasoft/macsweep/v1.0.0/tools/ports/module.sh|f5304f30f86bcac6a209c176ec8f32e296fc93cebb3172935d900f6962756780|1.0.0
+network|NetSweep|1.0.0|DNS, connectivity, and network diagnostics|https://raw.githubusercontent.com/cybasoft/macsweep/v1.0.0/tools/network/module.sh|a5ab7c543210c5482a972bd682a5524fa84c7e1a302ed2815bc2bb06ce371dce|1.0.0
+doctor|DevSweep|1.0.0|Development environment diagnostics|https://raw.githubusercontent.com/cybasoft/macsweep/v1.0.0/tools/doctor/module.sh|a1b8f934c26f78970c6eac6851f3161b62d0354b65ecf385968f9474597b94ac|1.0.0
+files|FileSweep|1.0.0|Filesystem inspection and metadata checks|https://raw.githubusercontent.com/cybasoft/macsweep/v1.0.0/tools/files/module.sh|118ce3df77b543894491318ec429ab14a3ba9305b6625b91ceec486147867ee7|1.0.0
+json|JSONSweep|1.0.0|JSON formatting, validation, and querying|https://raw.githubusercontent.com/cybasoft/macsweep/v1.0.0/tools/json/module.sh|8800a4e432a5d2ab0542987af905a1e34f31237011b9bc153493f74317f4448c|1.0.0

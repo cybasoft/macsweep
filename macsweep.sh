@@ -452,41 +452,103 @@ cmd_updates() {
 
 # ---------- main -------------------------------------------------------------
 
-usage() { sed -n '2,/^set -uo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//'; }
+MACSWEEP_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+MACSWEEP_VERSION="1.0.0"
+source "$MACSWEEP_ROOT/core/helpers.sh"
+source "$MACSWEEP_ROOT/core/modules.sh"
+source "$MACSWEEP_ROOT/core/installer.sh"
+source "$MACSWEEP_ROOT/core/dispatcher.sh"
+
+usage() { usage_main; }
 
 main() {
-  [[ "$(uname)" == "Darwin" ]] || die "this script is for macOS"
-
-  local cmd="${1:-help}"; shift 2>/dev/null || true
-  local args=() a
+  NON_INTERACTIVE=0
+  local positional=() a
   for a in "$@"; do
     case "$a" in
-      --apply|-a)       APPLY=1 ;;
-      --yes|-y)         YES=1 ;;
-      --docker-prune)   DOCKER_PRUNE=1 ;;
+      --non-interactive) NON_INTERACTIVE=1 ;;
+      --apply|-a) APPLY=1 ;;
+      --yes|-y) YES=1 ;;
+      --docker-prune) DOCKER_PRUNE=1 ;;
       --launchservices) LSREG=1 ;;
-      --spotlight)      SPOT=1 ;;
-      *)                args+=("$a") ;;
+      --spotlight) SPOT=1 ;;
+      *) positional+=("$a") ;;
     esac
   done
-  if (( ${#args[@]} )); then
-    set -- "${args[@]}"
-  else
-    set --
+
+  if (( ${#positional[@]} == 0 )); then
+    usage_main
+    return 0
+  fi
+
+  local cmd="${positional[0]}"
+  local args=()
+  if (( ${#positional[@]} > 1 )); then
+    args=("${positional[@]:1}")
   fi
 
   case "$cmd" in
-    health)    cmd_health ;;
-    clean)     cmd_clean ;;
-    dev)       cmd_dev ;;
-    all)       cmd_clean; TOTAL_KB=0; cmd_dev ;;
-    uninstall) cmd_uninstall "$@" ;;
-    large)     cmd_large "$@" ;;
-    startup)   cmd_startup ;;
-    optimize)  cmd_optimize ;;
-    updates)   cmd_updates ;;
-    help|-h|--help) usage ;;
-    *) usage; exit 1 ;;
+    --help|-h|help)
+      usage_main
+      ;;
+    --version)
+      core_version
+      ;;
+    --list|list)
+      cmd_list
+      ;;
+    install)
+      [[ -n "${args[0]:-}" ]] || { printf "usage: macsweep install <module> [--version 1.0.0]\n" >&2; return 2; }
+      local install_version=""
+      if [[ "${args[1]:-}" == "--version" ]]; then install_version="${args[2]:-}"; fi
+      module_install "${args[0]}" "$install_version"
+      ;;
+    uninstall)
+      [[ -n "${args[0]:-}" ]] || { printf "usage: macsweep uninstall <module>\n" >&2; return 2; }
+      module_uninstall "${args[0]}"
+      ;;
+    update)
+      if [[ -n "${args[0]:-}" ]]; then
+        module_update_one "${args[0]}"
+      else
+        cmd_update_all
+      fi
+      ;;
+    system)
+      case "${args[0]:-}" in
+        health) cmd_health ;;
+        optimize) args=("${args[@]:1}"); cmd_optimize ;;
+        updates) cmd_updates ;;
+        *) printf "Unknown system command. Use macsweep system health|optimize|updates\n" >&2; return 2 ;;
+      esac
+      ;;
+    clean)
+      case "${args[0]:-system}" in
+        system) cmd_clean ;;
+        dev) args=("${args[@]:1}"); cmd_dev ;;
+        large) args=("${args[@]:1}"); cmd_large "${args[@]}" ;;
+        *) printf "Unknown clean command. Use macsweep clean system|dev|large\n" >&2; return 2 ;;
+      esac
+      ;;
+    apps)
+      [[ "${args[0]:-}" == "uninstall" ]] || { printf "Usage: macsweep apps uninstall <App Name>\n" >&2; return 2; }
+      args=("${args[@]:1}")
+      cmd_uninstall "${args[@]}"
+      ;;
+    ports|network|doctor|files|json)
+      dispatch_module "$cmd" "${args[@]}"
+      ;;
+    startup)
+      cmd_startup
+      ;;
+    health) cmd_health ;;
+    dev) cmd_dev ;;
+    all) cmd_clean; TOTAL_KB=0; cmd_dev ;;
+    uninstall) cmd_uninstall "${args[@]}" ;;
+    large) cmd_large "${args[@]}" ;;
+    optimize) cmd_optimize ;;
+    updates) cmd_updates ;;
+    *) usage_main; return 2 ;;
   esac
 }
 

@@ -13,7 +13,7 @@ bash -n "$SCRIPT_DIR/macsweep.sh"
 "$SCRIPT_DIR/macsweep.sh" --help >"$TEMP_ROOT/help"
 grep -q "macsweep <command>" "$TEMP_ROOT/help"
 "$SCRIPT_DIR/macsweep.sh" --version >"$TEMP_ROOT/version"
-grep -q "1.0.0" "$TEMP_ROOT/version"
+grep -Eq "^[0-9]+\.[0-9]+\.[0-9]+$" "$TEMP_ROOT/version"
 "$SCRIPT_DIR/macsweep.sh" list >"$TEMP_ROOT/list"
 grep -q "PortSweep" "$TEMP_ROOT/list"
 "$SCRIPT_DIR/macsweep.sh" --non-interactive network >"$TEMP_ROOT/output" 2>&1 && exit 1 || status=$?

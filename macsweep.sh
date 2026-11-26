@@ -452,8 +452,16 @@ cmd_updates() {
 
 # ---------- main -------------------------------------------------------------
 
-MACSWEEP_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-MACSWEEP_VERSION="1.0.0"
+# Resolve symlinks (e.g. Homebrew's bin link) so core/ and modules.tsv are found.
+_src="${BASH_SOURCE[0]}"
+while [[ -L "$_src" ]]; do
+  _dir=$(cd -P "$(dirname "$_src")" && pwd)
+  _src=$(readlink "$_src")
+  [[ "$_src" == /* ]] || _src="$_dir/$_src"
+done
+MACSWEEP_ROOT=$(cd -P "$(dirname "$_src")" && pwd)
+unset _src _dir
+MACSWEEP_VERSION="0.1.1"
 source "$MACSWEEP_ROOT/core/helpers.sh"
 source "$MACSWEEP_ROOT/core/modules.sh"
 source "$MACSWEEP_ROOT/core/installer.sh"

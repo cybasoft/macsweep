@@ -19,10 +19,26 @@ printf "Building MacSweep %s release...\n" "$VERSION"
 STAGE_DIR="$WORK_DIR/macsweep"
 mkdir -p "$STAGE_DIR/core"
 
-cp "$REPO_DIR/macsweep.sh" "$STAGE_DIR/macsweep"
-cp "$REPO_DIR/modules.tsv" "$STAGE_DIR/"
 cp -r "$REPO_DIR/core"/* "$STAGE_DIR/core/"
+
+# Stamp the release version into the script.
+sed "s/^MACSWEEP_VERSION=.*/MACSWEEP_VERSION=\"$VERSION\"/" "$REPO_DIR/macsweep.sh" > "$STAGE_DIR/macsweep"
+grep -q "^MACSWEEP_VERSION=\"$VERSION\"$" "$STAGE_DIR/macsweep" || { echo "failed to stamp version"; exit 1; }
 chmod 0755 "$STAGE_DIR/macsweep"
+
+# Pin each module artifact to this tag and the checksum of the file being tagged.
+while IFS= read -r line || [[ -n "$line" ]]; do
+  if [[ -z "$line" || "${line:0:1}" == "#" ]]; then
+    printf '%s\n' "$line"
+    continue
+  fi
+  IFS='|' read -r id name mver desc _url _sum minimum <<< "$line"
+  module_file="$REPO_DIR/tools/$id/module.sh"
+  [[ -f "$module_file" ]] || { echo "missing module source: $module_file" >&2; exit 1; }
+  sum=$(shasum -a 256 "$module_file" | awk '{print $1}')
+  url="https://raw.githubusercontent.com/cybasoft/macsweep/$TAG/tools/$id/module.sh"
+  printf '%s|%s|%s|%s|%s|%s|%s\n' "$id" "$name" "$mver" "$desc" "$url" "$sum" "$minimum"
+done < "$REPO_DIR/modules.tsv" > "$STAGE_DIR/modules.tsv"
 
 TARBALL="$WORK_DIR/macsweep-$VERSION.tar.gz"
 tar -C "$WORK_DIR" -czf "$TARBALL" macsweep/

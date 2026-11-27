@@ -172,4 +172,4 @@ macsweep is licensed under the [MIT License](LICENSE).
 
 ## Checks
 
-Run `bash -n macsweep.sh core/*.sh tools/*/module.sh`, `shellcheck macsweep.sh core/*.sh tools/*/module.sh`, and `bash tests/safety.sh` before release. The safety tests require macOS and use a temporary home directory; Docker and Homebrew are mocked, and uninstall is only previewed.
+Run `bash -n macsweep.sh core/*.sh tools/*/module.sh`, `shellcheck macsweep.sh core/*.sh tools/*/module.sh`, and `bash tests/safety.sh`, `bash tests/architecture.sh`, and `bash tests/install.sh` before release. The tests require macOS and use a temporary home directory; Docker, Homebrew, and `curl` are mocked, and uninstall is only previewed.

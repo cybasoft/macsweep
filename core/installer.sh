@@ -45,7 +45,7 @@ module_install() {
   temp=$(mktemp -d "$MACSWEEP_CACHE_DIR/install.XXXXXX") || return "$MACSWEEP_EXIT_INSTALL"
   download="$temp/module.sh"
   if ! curl --fail --location --silent --show-error --proto '=https' --tlsv1.2 \
-      -- "$MODULE_ARTIFACT" -o "$download"; then
+      --output "$download" -- "$MODULE_ARTIFACT"; then
     rm -rf "$temp"
     printf "error: could not download %s\n" "$MODULE_NAME" >&2
     return "$MACSWEEP_EXIT_INSTALL"
